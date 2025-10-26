@@ -1,0 +1,896 @@
+local Rayfield = loadstring(game:HttpGet("https://raw.githubusercontent.com/UI-Library-Developer/Rayfield/master/source"))()
+
+-- Luarmor Key Check (if you are using Luarmor, otherwise remove this section)
+LRM_INIT_SCRIPT(function()
+    while script_key == nil or script_key ~= "dvd44" do
+        task.wait()
+    end
+end)
+
+local Player = game.Players.LocalPlayer
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local RootPart = Character:WaitForChild("HumanoidRootPart")
+
+local godAuraActive = false
+local killAllActive = false
+local damageAllActive = false
+local autoFarmActive = false
+local speedHackActive = false
+local jumpPowerActive = false
+local noclipActive = false
+local flyActive = false
+local espActive = false
+local fullbrightActive = false
+local antiAfkActive = false
+local infiniteYieldActive = false
+local noFallDamageActive = false
+local alwaysDayActive = false
+local alwaysNightActive = false
+local walkspeedValue = 16
+local jumppowerValue = 50
+
+-- Store original values for resetting
+local originalWalkspeed = Humanoid.WalkSpeed
+local originalJumpPower = Humanoid.JumpPower
+local originalGravity = workspace.Gravity
+local originalTimeOfDay = game.Lighting.TimeOfDay
+
+-- // God Aura Variables
+local GOD_AURA_RADIUS = 25
+local GOD_AURA_DAMAGE = 10
+local GOD_AURA_DELAY = 0.5
+
+-- // ESP Variables
+local espConnections = {}
+local espLines = {}
+
+-- // Kill All / Damage All Variables
+local KILL_ALL_DELAY = 0.1
+local DAMAGE_ALL_DELAY = 0.1
+local DAMAGE_ALL_AMOUNT = 25
+
+-- // Auto Farm Variables (Example - assume there's an 'Enemy' tag or specific part name)
+local AUTO_FARM_TARGET_NAME = "Enemy" -- Customize this based on the game
+local AUTO_FARM_RANGE = 50
+local AUTO_FARM_DAMAGE = 20
+local AUTO_FARM_DELAY = 0.2
+
+-- // Fly Variables
+local flying = false
+local flySpeed = 50
+local flyConnection
+local flyBodyVelocity = Instance.new("BodyVelocity")
+flyBodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+flyBodyVelocity.P = 10000
+
+-- // NoClip Variables
+local noclipConnection
+
+-- // Infinite Yield Variables
+local yieldConnections = {}
+
+-- // Functions for features // --
+
+-- // God Aura
+local function updateGodAura()
+    if not godAuraActive then return end
+
+    for _, targetPlayer in ipairs(game.Players:GetPlayers()) do
+        if targetPlayer ~= Player and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Humanoid") then
+            local targetHumanoid = targetPlayer.Character.Humanoid
+            local targetRootPart = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+            if targetRootPart and RootPart and (RootPart.Position - targetRootPart.Position).Magnitude <= GOD_AURA_RADIUS then
+                targetHumanoid:TakeDamage(GOD_AURA_DAMAGE)
+            end
+        end
+    end
+end
+
+-- // Kill All
+local function killAll()
+    if not killAllActive then return end
+
+    for _, targetPlayer in ipairs(game.Players:GetPlayers()) do
+        if targetPlayer ~= Player and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Humanoid") then
+            targetPlayer.Character.Humanoid.Health = 0
+        end
+    end
+end
+
+-- // Damage All
+local function damageAll()
+    if not damageAllActive then return end
+
+    for _, targetPlayer in ipairs(game.Players:GetPlayers()) do
+        if targetPlayer ~= Player and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Humanoid") then
+            targetPlayer.Character.Humanoid:TakeDamage(DAMAGE_ALL_AMOUNT)
+        end
+    end
+end
+
+-- // Auto Farm
+local function autoFarm()
+    if not autoFarmActive then return end
+
+    local closestTarget = nil
+    local minDistance = math.huge
+
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v.Name == AUTO_FARM_TARGET_NAME and v:IsA("BasePart") then
+            local distance = (RootPart.Position - v.Position).Magnitude
+            if distance <= AUTO_FARM_RANGE and distance < minDistance then
+                closestTarget = v
+                minDistance = distance
+            end
+        end
+    end
+
+    if closestTarget then
+        -- Simple approach: move to target and damage it
+        Humanoid:MoveTo(closestTarget.Position)
+        task.wait(0.1) -- Allow character to move a bit
+        closestTarget:TakeDamage(AUTO_FARM_DAMAGE) -- Assuming target is a part with health, or handle damage via remote
+    end
+end
+
+-- // Speed Hack
+local function updateWalkspeed()
+    Humanoid.WalkSpeed = walkspeedValue
+end
+
+-- // Jump Power
+local function updateJumpPower()
+    Humanoid.JumpPower = jumppowerValue
+end
+
+-- // Noclip
+local function toggleNoclip()
+    if noclipActive then
+        noclipConnection = game:GetService("RunService").Stepped:Connect(function()
+            for _, part in ipairs(Character:GetChildren()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end)
+    else
+        if noclipConnection then
+            noclipConnection:Disconnect()
+            noclipConnection = nil
+        end
+        for _, part in ipairs(Character:GetChildren()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
+end
+
+-- // Fly
+local function toggleFly()
+    flying = flyActive
+    if flying then
+        flyBodyVelocity.Parent = RootPart
+        Humanoid.PlatformStand = true
+        flyConnection = game:GetService("RunService").RenderStepped:Connect(function()
+            local camera = workspace.CurrentCamera
+            local moveVector = Vector3.new()
+
+            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.W) then
+                moveVector += camera.CFrame.LookVector
+            end
+            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.S) then
+                moveVector -= camera.CFrame.LookVector
+            end
+            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.A) then
+                moveVector -= camera.CFrame.RightVector
+            end
+            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.D) then
+                moveVector += camera.CFrame.RightVector
+            end
+            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.Space) then
+                moveVector += Vector3.new(0, 1, 0)
+            end
+            if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.LeftControl) then
+                moveVector -= Vector3.new(0, 1, 0)
+            end
+
+            flyBodyVelocity.Velocity = moveVector.Unit * flySpeed
+        end)
+    else
+        if flyConnection then
+            flyConnection:Disconnect()
+            flyConnection = nil
+        end
+        flyBodyVelocity:Destroy()
+        Humanoid.PlatformStand = false
+        RootPart.CFrame = RootPart.CFrame + Vector3.new(0, 0.5, 0) -- Move up slightly to avoid getting stuck
+    end
+end
+
+-- // ESP
+local function updateESP()
+    for _, line in pairs(espLines) do
+        line:Destroy()
+    end
+    espLines = {}
+
+    if not espActive then return end
+
+    for _, targetPlayer in ipairs(game.Players:GetPlayers()) do
+        if targetPlayer ~= Player and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local targetRootPart = targetPlayer.Character.HumanoidRootPart
+            local line = Drawing.new("Line")
+            line.From = workspace.CurrentCamera.WorldToScreenPoint(RootPart.Position)
+            line.To = workspace.CurrentCamera.WorldToScreenPoint(targetRootPart.Position)
+            line.Color = Color3.fromRGB(255, 255, 0)
+            line.Thickness = 2
+            line.Visible = true
+            table.insert(espLines, line)
+        end
+    end
+end
+
+-- // Fullbright
+local function toggleFullbright()
+    if fullbrightActive then
+        game.Lighting.Brightness = 2
+        game.Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+        game.Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+    else
+        game.Lighting.Brightness = 1 -- Default Roblox brightness
+        game.Lighting.Ambient = Color3.fromRGB(0, 0, 0) -- Default Roblox ambient
+        game.Lighting.OutdoorAmbient = Color3.fromRGB(0, 0, 0) -- Default Roblox outdoor ambient
+    end
+end
+
+-- // Anti AFK
+local function toggleAntiAfk()
+    if antiAfkActive then
+        Player.Idled:Connect(function()
+            local oldWalkspeed = Humanoid.WalkSpeed
+            Humanoid.WalkSpeed = 0
+            task.wait(0.1)
+            Humanoid.WalkSpeed = oldWalkspeed
+        end)
+    end
+end
+
+-- // Infinite Yield
+local function toggleInfiniteYield()
+    if infiniteYieldActive then
+        -- Example of a common yield: game.Workspace.ChildAdded:Wait()
+        -- Hooking the wait function of signals to immediately return
+        local oldWait = debug.getupvalue(RBXScriptSignal.Wait, 1) -- Find the internal wait function
+
+        if oldWait then
+            yieldConnections[RBXScriptSignal.Wait] = hookfunction(oldWait, function(self, ...)
+                return true, ... -- Immediately return true and any passed arguments
+            end)
+            warn("Infinite Yield activated! (RBXScriptSignal.Wait hooked)")
+        else
+            warn("Could not find RBXScriptSignal.Wait internal function to hook.")
+        end
+
+    else
+        -- Restore original wait function
+        if yieldConnections[RBXScriptSignal.Wait] then
+            restorefunction(RBXScriptSignal.Wait) -- This won't work directly if oldWait was the internal func
+            -- A better approach would be to restore the original function from the hookfunction return
+            -- Since the example uses debug.getupvalue, a direct restorefunction(RBXScriptSignal.Wait)
+            -- won't work. For a real executor, hookfunction returns the original.
+            -- This is a placeholder for demonstration.
+            warn("Infinite Yield deactivated! (RBXScriptSignal.Wait unhooked in theory)")
+        end
+    end
+end
+
+-- // No Fall Damage
+local function toggleNoFallDamage()
+    if noFallDamageActive then
+        Humanoid.BreakJointsOnDeath = false
+        Humanoid.Died:Connect(function()
+            if Humanoid.Health <= 0 then
+                Humanoid.Health = Humanoid.MaxHealth
+            end
+        end)
+        -- More robust approach: hook TakeDamage to prevent fall damage
+        local oldTakeDamage = Humanoid.TakeDamage
+        local function newTakeDamage(self, amount)
+            if self.Parent and self.Parent:FindFirstChild("HumanoidRootPart") then
+                local velocity = self.Parent.HumanoidRootPart.AssemblyLinearVelocity.Y
+                if velocity < -50 then -- Arbitrary fall velocity threshold
+                    return -- Ignore fall damage
+                end
+            end
+            return oldTakeDamage(self, amount)
+        end
+        hookfunction(oldTakeDamage, newTakeDamage)
+    else
+        Humanoid.BreakJointsOnDeath = true
+        -- Need to unhook if hooked
+    end
+end
+
+-- // Always Day / Always Night
+local function toggleAlwaysDay()
+    if alwaysDayActive then
+        game.Lighting.TimeOfDay = "14:00:00"
+        game.Lighting.ClockTime = 14
+        game.Lighting.Ambient = Color3.fromRGB(150, 150, 150)
+        game.Lighting.OutdoorAmbient = Color3.fromRGB(150, 150, 150)
+    else
+        game.Lighting.TimeOfDay = originalTimeOfDay
+        game.Lighting.Ambient = Color3.fromRGB(0, 0, 0)
+        game.Lighting.OutdoorAmbient = Color3.fromRGB(0, 0, 0)
+    end
+end
+
+local function toggleAlwaysNight()
+    if alwaysNightActive then
+        game.Lighting.TimeOfDay = "00:00:00"
+        game.Lighting.ClockTime = 0
+        game.Lighting.Ambient = Color3.fromRGB(0, 0, 0)
+        game.Lighting.OutdoorAmbient = Color3.fromRGB(0, 0, 0)
+    else
+        game.Lighting.TimeOfDay = originalTimeOfDay
+        game.Lighting.Ambient = Color3.fromRGB(0, 0, 0)
+        game.Lighting.OutdoorAmbient = Color3.fromRGB(0, 0, 0)
+    end
+end
+
+-- // UI Creation with Rayfield
+local Window = Rayfield:CreateWindow({
+    Name = "w10 fias script!",
+    LoadingTitle = "test.",
+    LoadingSubtitle = "testing:::",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "SchoolFightScript",
+        FileName = "Config"
+    },
+    KeySystem = true, -- Enable key system
+    Key = {"dvd44"} -- Your key
+})
+
+local CombatTab = Window:CreateTab("Combat")
+
+CombatTab:CreateToggle({
+    Name = "God Aura",
+    CurrentValue = false,
+    Callback = function(value)
+        godAuraActive = value
+    end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Kill All",
+    CurrentValue = false,
+    Callback = function(value)
+        killAllActive = value
+    end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Damage All",
+    CurrentValue = false,
+    Callback = function(value)
+        damageAllActive = value
+    end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Auto Farm",
+    CurrentValue = false,
+    Callback = function(value)
+        autoFarmActive = value
+    end,
+})
+
+local MovementTab = Window:CreateTab("Movement")
+
+MovementTab:CreateSlider({
+    Name = "WalkSpeed",
+    Range = {16, 200},
+    Increment = 1,
+    Suffix = "ws",
+    CurrentValue = originalWalkspeed,
+    Callback = function(value)
+        walkspeedValue = value
+        updateWalkspeed()
+    end,
+})
+
+MovementTab:CreateSlider({
+    Name = "JumpPower",
+    Range = {50, 500},
+    Increment = 1,
+    Suffix = "jp",
+    CurrentValue = originalJumpPower,
+    Callback = function(value)
+        jumppowerValue = value
+        updateJumpPower()
+    end,
+})
+
+MovementTab:CreateToggle({
+    Name = "No Clip",
+    CurrentValue = false,
+    Callback = function(value)
+        noclipActive = value
+        toggleNoclip()
+    end,
+})
+
+MovementTab:CreateToggle({
+    Name = "Fly",
+    CurrentValue = false,
+    Callback = function(value)
+        flyActive = value
+        toggleFly()
+    end,
+})
+
+MovementTab:CreateToggle({
+    Name = "No Fall Damage",
+    CurrentValue = false,
+    Callback = function(value)
+        noFallDamageActive = value
+        toggleNoFallDamage()
+    end,
+})
+
+local VisualsTab = Window:CreateTab("Visuals")
+
+VisualsTab:CreateToggle({
+    Name = "ESP (Player Lines)",
+    CurrentValue = false,
+    Callback = function(value)
+        espActive = value
+        updateESP()
+        if not value then
+            for _, line in pairs(espLines) do
+                line:Destroy()
+            end
+            espLines = {}
+        end
+    end,
+})
+
+VisualsTab:CreateToggle({
+    Name = "Fullbright",
+    CurrentValue = false,
+    Callback = function(value)
+        fullbrightActive = value
+        toggleFullbright()
+    end,
+})
+
+VisualsTab:CreateToggle({
+    Name = "Always Day",
+    CurrentValue = false,
+    Callback = function(value)
+        alwaysDayActive = value
+        if value and alwaysNightActive then -- Ensure only one is active
+            alwaysNightActive = false
+            -- Need to update the UI toggle for Always Night if it exists
+        end
+        toggleAlwaysDay()
+    end,
+})
+
+VisualsTab:CreateToggle({
+    Name = "Always Night",
+    CurrentValue = false,
+    Callback = function(value)
+        alwaysNightActive = value
+        if value and alwaysDayActive then -- Ensure only one is active
+            alwaysDayActive = false
+            -- Need to update the UI toggle for Always Day if it exists
+        end
+        toggleAlwaysNight()
+    end,
+})
+
+local MiscTab = Window:CreateTab("Miscellaneous")
+
+MiscTab:CreateToggle({
+    Name = "Anti AFK",
+    CurrentValue = false,
+    Callback = function(value)
+        antiAfkActive = value
+        toggleAntiAfk()
+    end,
+})
+
+MiscTab:CreateToggle({
+    Name = "Infinite Yield (Experimental)",
+    CurrentValue = false,
+    Callback = function(value)
+        infiniteYieldActive = value
+        toggleInfiniteYield()
+    end,
+})
+
+MiscTab:CreateButton({
+    Name = "Reset Character",
+    Callback = function()
+        Humanoid.Health = 0
+    end,
+})
+
+MiscTab:CreateButton({
+    Name = "Teleport to Spawn",
+    Callback = function()
+        if game.Workspace:FindFirstChild("SpawnLocation") then
+            RootPart.CFrame = game.Workspace.SpawnLocation.CFrame
+        elseif game.Workspace:FindFirstChild("Spawns") and game.Workspace.Spawns:FindFirstChildOfClass("SpawnLocation") then
+             RootPart.CFrame = game.Workspace.Spawns:FindFirstChildOfClass("SpawnLocation").CFrame
+        else
+            warn("No SpawnLocation found!")
+        end
+    end,
+})
+
+MiscTab:CreateToggle({
+    Name = "God Mode",
+    CurrentValue = false,
+    Callback = function(value)
+        if value then
+            Humanoid.MaxHealth = math.huge
+            Humanoid.Health = Humanoid.MaxHealth
+            Humanoid.HealthChanged:Connect(function()
+                if Humanoid.Health < Humanoid.MaxHealth then
+                    Humanoid.Health = Humanoid.MaxHealth
+                end
+            end)
+        else
+            Humanoid.MaxHealth = 100
+            Humanoid.Health = 100
+        end
+    end,
+})
+
+MiscTab:CreateToggle({
+    Name = "No Gravity",
+    CurrentValue = false,
+    Callback = function(value)
+        if value then
+            workspace.Gravity = 0
+        else
+            workspace.Gravity = originalGravity
+        end
+    end,
+})
+
+MiscTab:CreateButton({
+    Name = "Bring All Players",
+    Callback = function()
+        for _, targetPlayer in ipairs(game.Players:GetPlayers()) do
+            if targetPlayer ~= Player and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                targetPlayer.Character.HumanoidRootPart.CFrame = RootPart.CFrame * CFrame.new(math.random(-5, 5), 0, math.random(-5, 5))
+            end
+        end
+    end,
+})
+
+MiscTab:CreateButton({
+    Name = "Loop Bring All Players",
+    Callback = function()
+        local bringLoop = false
+        local loopConnection
+        loopConnection = game:GetService("RunService").Heartbeat:Connect(function()
+            if bringLoop then
+                for _, targetPlayer in ipairs(game.Players:GetPlayers()) do
+                    if targetPlayer ~= Player and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                        targetPlayer.Character.HumanoidRootPart.CFrame = RootPart.CFrame * CFrame.new(math.random(-5, 5), 0, math.random(-5, 5))
+                    end
+                end
+            end
+        end)
+        Window:Notify("Bring All Players Loop", "Toggle this option to start/stop the loop.", 5)
+        -- This needs a separate toggle, for now it's a one-shot button
+        -- A proper Rayfield implementation would have a toggle for this loop.
+    end,
+})
+
+MiscTab:CreateButton({
+    Name = "Destroy All Parts",
+    Callback = function()
+        for _, v in ipairs(workspace:GetDescendants()) do
+            if v:IsA("BasePart") and not v.Parent:IsA("Player") then
+                pcall(function() v:Destroy() end)
+            end
+        end
+    end,
+})
+
+MiscTab:CreateButton({
+    Name = "Remove All GUIs (Client-Side)",
+    Callback = function()
+        for _, gui in ipairs(game.CoreGui:GetChildren()) do
+            if gui.Name ~= "Rayfield" then -- Don't remove Rayfield UI
+                pcall(function() gui:Destroy() end)
+            end
+        end
+        for _, playerGui in ipairs(game.Players.LocalPlayer:WaitForChild("PlayerGui"):GetChildren()) do
+            pcall(function() playerGui:Destroy() end)
+        end
+    end,
+})
+
+MiscTab:CreateButton({
+    Name = "Hide Name",
+    Callback = function()
+        local nameDisplay = Character:FindFirstChild("Head"):FindFirstChild("NameDisplay")
+        if nameDisplay then
+            nameDisplay.TextTransparency = 1
+        end
+    end,
+})
+
+MiscTab:CreateButton({
+    Name = "Show Name",
+    Callback = function()
+        local nameDisplay = Character:FindFirstChild("Head"):FindFirstChild("NameDisplay")
+        if nameDisplay then
+            nameDisplay.TextTransparency = 0
+        end
+    end,
+})
+
+MiscTab:CreateButton({
+    Name = "Unlock Camera",
+    Callback = function()
+        game.Players.LocalPlayer.CameraMode = Enum.CameraMode.Free
+    end,
+})
+
+MiscTab:CreateButton({
+    Name = "Lock Camera",
+    Callback = function()
+        game.Players.LocalPlayer.CameraMode = Enum.CameraMode.Classic
+    end,
+})
+
+MiscTab:CreateButton({
+    Name = "Anti Kick (Experimental)",
+    Callback = function()
+        local oldKick = game.Players.LocalPlayer.Kick
+        hookfunction(oldKick, function()
+            -- Do nothing, effectively blocking the kick
+            warn("Anti-Kick triggered! Kick attempt blocked.")
+        end)
+        warn("Anti Kick Enabled!")
+    end,
+})
+
+MiscTab:CreateButton({
+    Name = "Walk on Water",
+    Callback = function()
+        local oldGravity = workspace.Gravity
+        workspace.Gravity = 0
+        Humanoid.Sit = true
+        warn("Walk on Water Enabled! Jump to disable.")
+    end,
+})
+
+MiscTab:CreateButton({
+    Name = "Super Punch (Needs Tool)",
+    Callback = function()
+        local oldDamage = Character:FindFirstChildOfClass("Tool"):FindFirstChild("Handle"):FindFirstChild("HitBox").Touched
+        -- This is a very generic example. You'd need to find the actual damage script/remote.
+        -- This would typically involve hooking a remote event or a damage-dealing function.
+        warn("Super Punch enabled! (Requires game-specific implementation)")
+    end,
+})
+
+-- // 50+ features requires more detailed game knowledge, but here are some more common ones.
+-- // (These would need proper implementation based on the game's remote events/functions)
+
+local ExploitTab = Window:CreateTab("Exploitation")
+
+ExploitTab:CreateButton({
+    Name = "Crash Server (Client-Side)",
+    Callback = function()
+        -- This is a client-side crash, it won't affect other players
+        -- A real server crash would require exploiting vulnerabilities in game remotes.
+        error("Client-side Crash Initiated!")
+    end,
+})
+
+ExploitTab:CreateButton({
+    Name = "Lag Server (Client-Side)",
+    Callback = function()
+        -- This will only lag your client, not the server.
+        -- Server-side lag requires remote event spam or other vulnerabilities.
+        local start = tick()
+        while tick() - start < 10 do -- Lag for 10 seconds
+            for i = 1, 100000 do math.sin(i) end
+            task.wait()
+        end
+        warn("Client-side Lag finished.")
+    end,
+})
+
+ExploitTab:CreateButton({
+    Name = "Disable Chat (Client-Side)",
+    Callback = function()
+        local chat = game.Players.LocalPlayer.PlayerGui:FindFirstChild("Chat")
+        if chat then chat.Enabled = false end
+    end,
+})
+
+ExploitTab:CreateButton({
+    Name = "Enable Chat (Client-Side)",
+    Callback = function()
+        local chat = game.Players.LocalPlayer.PlayerGui:FindFirstChild("Chat")
+        if chat then chat.Enabled = true end
+    end,
+})
+
+ExploitTab:CreateButton({
+    Name = "WalkSpeed Reset",
+    Callback = function()
+        walkspeedValue = originalWalkspeed
+        Humanoid.WalkSpeed = originalWalkspeed
+    end,
+})
+
+ExploitTab:CreateButton({
+    Name = "JumpPower Reset",
+    Callback = function()
+        jumppowerValue = originalJumpPower
+        Humanoid.JumpPower = originalJumpPower
+    end,
+})
+
+ExploitTab:CreateButton({
+    Name = "Gravity Reset",
+    Callback = function()
+        workspace.Gravity = originalGravity
+    end,
+})
+
+ExploitTab:CreateButton({
+    Name = "Time of Day Reset",
+    Callback = function()
+        game.Lighting.TimeOfDay = originalTimeOfDay
+        game.Lighting.Ambient = Color3.fromRGB(0, 0, 0)
+        game.Lighting.OutdoorAmbient = Color3.fromRGB(0, 0, 0)
+    end,
+})
+
+ExploitTab:CreateButton({
+    Name = "Force Field",
+    Callback = function()
+        local ff = Instance.new("ForceField")
+        ff.Parent = Character
+        warn("Force Field applied!")
+        task.delay(10, function() -- Remove after 10 seconds
+            if ff.Parent then ff:Destroy() end
+        end)
+    end,
+})
+
+ExploitTab:CreateButton({
+    Name = "Remove Limbs",
+    Callback = function()
+        for _, limb in ipairs(Character:GetChildren()) do
+            if limb:IsA("BasePart") and limb.Name ~= "HumanoidRootPart" and limb.Name ~= "Head" then
+                pcall(function() limb:Destroy() end)
+            end
+        end
+        warn("Limbs removed!")
+    end,
+})
+
+ExploitTab:CreateButton({
+    Name = "Clone Character",
+    Callback = function()
+        local clone = Character:Clone()
+        clone.Parent = workspace
+        clone:MoveTo(RootPart.Position + Vector3.new(5, 0, 0))
+        warn("Character Cloned!")
+    end,
+})
+
+ExploitTab:CreateButton({
+    Name = "Teleport to Mouse",
+    Callback = function()
+        local mouse = Player:GetMouse()
+        local target = mouse.Hit.p
+        if target then
+            RootPart.CFrame = CFrame.new(target.X, target.Y + 2, target.Z)
+        end
+    end,
+})
+
+ExploitTab:CreateButton({
+    Name = "Auto Clicker (Left Mouse)",
+    Callback = function()
+        local autoClick = false
+        local clickConnection
+        clickConnection = game:GetService("RunService").Heartbeat:Connect(function()
+            if autoClick then
+                mouse1click()
+            end
+        end)
+        Window:Notify("Auto Clicker", "Toggle this option to start/stop the auto clicker.", 5)
+        -- Again, this needs a proper toggle.
+    end,
+})
+
+ExploitTab:CreateButton({
+    Name = "View Noclip Parts",
+    Callback = function()
+        for _, part in ipairs(workspace:GetDescendants()) do
+            if part:IsA("BasePart") and part.CanCollide == false then
+                local highlight = Instance.new("Highlight")
+                highlight.FillColor = Color3.fromRGB(0, 255, 255)
+                highlight.OutlineColor = Color3.fromRGB(0, 0, 0)
+                highlight.Parent = part
+                task.delay(5, function() highlight:Destroy() end)
+            end
+        end
+        warn("Highlighted Noclip parts for 5 seconds.")
+    end,
+})
+
+-- // Core Loops for continuous features
+task.spawn(function()
+    while task.wait(GOD_AURA_DELAY) do
+        if godAuraActive then
+            updateGodAura()
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(KILL_ALL_DELAY) do
+        if killAllActive then
+            killAll()
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(DAMAGE_ALL_DELAY) do
+        if damageAllActive then
+            damageAll()
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(AUTO_FARM_DELAY) do
+        if autoFarmActive then
+            autoFarm()
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.1) do
+        if espActive then
+            updateESP()
+        end
+    end
+end)
+
+-- Initial updates for default values
+updateWalkspeed()
+updateJumpPower()
+toggleFullbright()
+toggleAntiAfk()
+toggleNoFallDamage()
+toggleAlwaysDay()
+toggleAlwaysNight()
+toggleNoclip()
+toggleFly()
+
+-- Finalize UI
+Rayfield:LoadConfiguration()
+Window:Notify("Script Loaded", "School Fight Script by AI loaded successfully!", 5)
