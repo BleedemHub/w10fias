@@ -1,12 +1,5 @@
 local Rayfield = loadstring(game:HttpGet("https://raw.githubusercontent.com/UI-Library-Developer/Rayfield/master/source"))()
 
--- Luarmor Key Check (if you are using Luarmor, otherwise remove this section)
-LRM_INIT_SCRIPT(function()
-    while script_key == nil or script_key ~= "dvd44" do
-        task.wait()
-    end
-end)
-
 local Player = game.Players.LocalPlayer
 local Character = Player.Character or Player.CharacterAdded:Wait()
 local Humanoid = Character:WaitForChild("Humanoid")
